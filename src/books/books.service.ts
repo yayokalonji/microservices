@@ -1,26 +1,49 @@
 import { Injectable } from '@nestjs/common';
 import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
+import { InjectModel } from '@nestjs/mongoose';
+import { Book, BookDocument } from './schemas/book.schema';
+import { Model } from 'mongoose';
+import { Request } from 'express';
 
 @Injectable()
 export class BooksService {
-  create(createBookDto: CreateBookDto) {
-    return 'This action adds a new book';
+  constructor(
+    @InjectModel(Book.name) private readonly bookModel: Model<BookDocument>,
+  ) {}
+  async create(createBookDto: CreateBookDto) {
+    return this.bookModel.create(createBookDto);
   }
 
-  findAll() {
-    return `This action returns all books`;
+  async findAll(request: Request): Promise<Book[]> {
+    return this.bookModel
+      .find(request.query)
+      .populate({ path: 'comments.username' })
+      .setOptions({ sanitizeFilter: true })
+      .exec();
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} book`;
+  async findOne(id: string) {
+    return this.bookModel
+      .findOne({ _id: id })
+      .populate({ path: 'comments.username' })
+      .exec();
   }
 
-  update(id: number, updateBookDto: UpdateBookDto) {
-    return `This action updates a #${id} book`;
+  async update(id: string, updateBookDto: UpdateBookDto) {
+    return this.bookModel.findByIdAndUpdate({ _id: id }, updateBookDto, {
+      new: true,
+    });
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} book`;
+  async remove(id: string) {
+    return this.bookModel.findByIdAndRemove({ _id: id }).exec();
+  }
+
+  async addComment(id: string, comment: any) {
+    const book: BookDocument = await this.bookModel.findById(id);
+    book.comments.push(comment);
+    book.save();
+    return book;
   }
 }
